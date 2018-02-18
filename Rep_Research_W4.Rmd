@@ -1,0 +1,133 @@
+---
+title: "Reproducible Research Course Project Week4"
+author: "Yue Li"
+date: "February 18, 2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background  
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.  
+  
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+## Synopsis  
+  
+The analysis on the storm event database shows that tornadoes are the most dangerous weather event to the populations health. The economic impact of weather events was evaluated as the sum of property damage and crop damage. Flash floods caused the highest economic damages between 1950 and 2011.
+
+## Data Loading
+  
+First, data is downloaded from the link below:
+
+```{r data}
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(plyr))
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(url, "RawData.csv.bz2")
+mydata <- read.csv("RawData.csv.bz2")
+```
+
+## Data Processing  
+ 
+Take a subset of the data to include the variables of interest: **FATALITIES** and **INJURIES** would be used in question 1; **PROPDMG**,  **CROPDMG**, **PROPDMGEXP** and **CROPDMGEXP** would be used in question 2:
+```{r}
+dim(mydata)
+mydata_sub <- mydata[,c("EVTYPE","FATALITIES","INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+head(mydata_sub)
+unique(mydata_sub$PROPDMGEXP)
+unique(mydata_sub$CROPDMGEXP)
+```
+As we can see, **PROPDMGEXP** and **CROPDMGEXP** need to be preprocessed in questions 2. According to the column definition, the actual damage in $USD in indicated by **PROPDMGEXP** and **CROPDMGEXP**. We will map them as follows:
+
+```{r}
+mydata_sub$PROPDMGEXP = mapvalues(mydata_sub$PROPDMGEXP, from = c("K", "M", "", "B", "m", "+", "0", "5", "6", "?","4","2","3","h","7","H","-","1","8"), to = c(10^3,10^6,1,10^9,10^6,1,1,10^5,10^6,1,10^4,10^2,10^3,10^3,10^7,10^2,1,1,10^8))
+
+mydata_sub$CROPDMGEXP = mapvalues(mydata_sub$CROPDMGEXP, from = c("M", "K", "m", "B", "?", "0", "k", "2"), to = c(10^6,10^3,10^3,10^9,1,1,10^3,10^2))
+```
+
+
+## Questions 1  
+
+Across the United States, which types of events (as indicated in the 𝙴𝚅𝚃𝚈𝙿𝙴 variable) are most harmful with respect to population health? 
+
+From fatalities point of view:
+
+```{r}
+# Aggregate fatalities by event type
+Death_by_Evt <- aggregate(mydata_sub$FATALITIES, by = list(mydata_sub$EVTYPE), FUN = sum)
+colnames(Death_by_Evt) <- c("EVENTTYPE", "FATALITIES")
+
+# Reorder the data to show the most harmful event type
+Death_by_Evt_Ord <- Death_by_Evt[order(Death_by_Evt$FATALITIES, decreasing = TRUE),]
+Death_by_Evt_Ord[c(1:10),]
+
+```
+
+From Injuries point of view:
+
+```{r}
+# Aggregate injuries by event type
+Injury_by_Evt <- aggregate(mydata_sub$INJURIES, by = list(mydata_sub$EVTYPE), FUN = sum)
+colnames(Injury_by_Evt) <- c("EVENTTYPE", "INJURIES")
+
+# Reorder the data to show the most harmful event type
+Injury_by_Evt_Ord <- Injury_by_Evt[order(Injury_by_Evt$INJURIES, decreasing = TRUE),]
+Injury_by_Evt_Ord[c(1:10),]
+
+```
+
+
+## Result 
+
+```{r}
+# Plot the top 10 event type with most fatalities
+barplot(height = (Death_by_Evt_Ord$FATALITIES[1:10]), names.arg = Death_by_Evt_Ord$EVENTTYPE[1:10],col=heat.colors(10, alpha = 1), main = "Top 10 Fatalities for US Weather Events", ylab = "Number of Fatalities", las = 2, cex.names= 0.4)
+
+# Plot the top 10 event type with most injuries
+barplot(height = (Injury_by_Evt_Ord$INJURIES[1:10]), names.arg = Injury_by_Evt_Ord$EVENTTYPE[1:10],col=heat.colors(10, alpha = 1), main = "Top 10 Injuries for US Weather Events", ylab = "Number of Injuries", las = 2, cex.names= 0.4)
+
+```
+
+          
+
+  
+As shown in the plots, **Tornado** cause the highest fatalities and injuries.
+
+
+
+## Questions 2  
+
+Across the United States, which types of events have the greatest economic consequences?  
+
+We define the economic damage as the sum of crop damage and property damage.
+
+```{r}
+mydata_sub$TOTALDMG <- 10^(as.numeric(mydata_sub$PROPDMGEXP)) * mydata_sub$PROPDMG + 10^(as.numeric(mydata_sub$CROPDMGEXP)) * mydata_sub$CROPDMG
+
+# Aggregate economic damage by event type
+EcoDMG_by_Evt <- aggregate(mydata_sub$TOTALDMG, by = list(mydata_sub$EVTYPE), FUN = sum)
+colnames(EcoDMG_by_Evt) <- c("EVENTTYPE", "TOTALDMG")
+
+# Reorder the data to show the most harmful event type
+EcoDMG_by_Evt_Ord <- EcoDMG_by_Evt[order(EcoDMG_by_Evt$TOTALDMG, decreasing = TRUE),]
+EcoDMG_by_Evt_Ord[c(1:10),]
+
+```
+
+## Result 
+
+```{r}
+# Plot the top 10 event type with most economic damage
+barplot(height = (EcoDMG_by_Evt_Ord$TOTALDMG[1:10]), names.arg = EcoDMG_by_Evt_Ord$EVENTTYPE[1:10],col=heat.colors(10, alpha = 1), main = "Top 10 Economic Damage for US Weather Events", ylab = "Amount of Economic Damage", las = 2, cex.names= 0.4)
+
+```
+  
+            
+
+As shown in the plots, **Flood** cause the highest economic damage.
